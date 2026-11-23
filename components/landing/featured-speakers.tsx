@@ -81,7 +81,7 @@ export function FeaturedSpeakers() {
           </div>
         ) : (
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {speakers.slice(0, 4).map((spk) => (
+            {speakers.slice(0, 3).map((spk) => (
               <article
                 key={spk.id}
                 className="group relative flex flex-col justify-between overflow-hidden border border-white/10 bg-white/[0.02] p-6 transition-all duration-300 hover:border-[#FF00D4]/70 hover:shadow-[0_0_30px_rgba(255,0,212,0.12)]"
@@ -133,6 +133,45 @@ export function FeaturedSpeakers() {
                 </div>
               </article>
             ))}
+
+            {/* View All Card */}
+            <Link
+              href="/speakers"
+              className="group relative flex flex-col justify-between overflow-hidden border border-[#FF00D4]/40 bg-linear-to-b from-[#FF00D4]/10 via-[#8B5CFF]/5 to-[#050505] p-6 transition-all duration-300 hover:border-[#FF00D4] hover:shadow-[0_0_35px_rgba(255,0,212,0.25)]"
+            >
+              <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#FF00D4]/15 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:bg-[#FF00D4]/25" />
+
+              <div>
+                <div className="flex aspect-square w-full flex-col items-center justify-center rounded-md border border-white/10 bg-white/[0.03] transition-colors duration-300 group-hover:border-[#FF00D4]/40 group-hover:bg-[#FF00D4]/10">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#FF00D4] bg-[#FF00D4]/20 shadow-[0_0_20px_rgba(255,0,212,0.3)] transition-transform duration-300 group-hover:scale-110">
+                    <ArrowUpRight className="h-6 w-6 text-[#FF2D87] transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" />
+                  </div>
+                  <span className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#FF2D87]">
+                    Full Lineup
+                  </span>
+                  <span className="mt-1 text-xs text-white/50">
+                    {speakers.length > 3 ? `+${speakers.length - 3} more speakers` : "Explore roster"}
+                  </span>
+                </div>
+
+                <div className="mt-5">
+                  <span className="text-[10px] uppercase tracking-wider text-[#FF00D4]">
+                    Festival Speakers
+                  </span>
+                  <h3 className="mt-1 text-xl font-medium tracking-tight text-white transition-colors group-hover:text-[#FF2D87]">
+                    View All Speakers
+                  </h3>
+                  <p className="mt-1 text-xs text-white/55">
+                    Discover all cloud experts, architects, and visionaries joining Re:Invent Fest 2026.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4 text-xs font-semibold uppercase tracking-wider text-[#FF2D87] group-hover:text-white transition-colors">
+                <span>Browse All</span>
+                <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </div>
+            </Link>
           </div>
         )}
       </div>
