@@ -105,7 +105,7 @@ export default function RootLayout({
       <body className="min-h-screen antialiased">
         <AuthProvider>
           <Navbar />
-          <main>{children}</main>
+          {children}
           <Footer />
           <ScrollReveal />
         </AuthProvider>

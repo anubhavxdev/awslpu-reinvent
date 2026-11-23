@@ -21,6 +21,26 @@ function normalizePhone(value: string) {
   return cleaned;
 }
 
+function getSafeRedirect(rawRedirect: string | null): string {
+  if (!rawRedirect) return "/dashboard";
+  const trimmed = rawRedirect.trim();
+  if (
+    trimmed.startsWith("/") &&
+    !trimmed.startsWith("//") &&
+    !trimmed.startsWith("/\\")
+  ) {
+    try {
+      const parsed = new URL(trimmed, "http://localhost");
+      if (parsed.origin === "http://localhost") {
+        return parsed.pathname + parsed.search + parsed.hash;
+      }
+    } catch {
+      return "/dashboard";
+    }
+  }
+  return "/dashboard";
+}
+
 function AuthForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -53,9 +73,13 @@ function AuthForm() {
     }
   }, [searchParams]);
 
-  const redirectTarget = searchParams.get("redirect") || "/dashboard";
-  const redirectParam = searchParams.get("redirect");
-  const redirectQuery = redirectParam ? `&redirect=${encodeURIComponent(redirectParam)}` : "";
+  const redirectTarget = getSafeRedirect(searchParams.get("redirect"));
+  const rawRedirect = searchParams.get("redirect");
+  const safeParam = rawRedirect ? getSafeRedirect(rawRedirect) : null;
+  const redirectQuery =
+    safeParam && safeParam !== "/dashboard"
+      ? `&redirect=${encodeURIComponent(safeParam)}`
+      : "";
 
   const switchMode = (mode: "login" | "register") => {
     setAuthMode(mode);
@@ -72,41 +96,22 @@ function AuthForm() {
       const normalizedEmail = email.trim().toLowerCase();
 
       if (authMode === "register") {
-        const response = await fetch("/api/auth/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            email: normalizedEmail,
-            phone: normalizePhone(phone),
-            workspace_name: workspaceName.trim(),
-            workspace_uid: workspaceId.trim(),
-            password,
-          }),
+        await register({
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          email: normalizedEmail,
+          phone: normalizePhone(phone),
+          workspace_name: workspaceName.trim(),
+          workspace_uid: workspaceId.trim(),
+          password,
         });
-
-        const data = await response.json().catch(() => null);
-
-        if (!response.ok) {
-          throw new Error(
-            data?.detail ||
-              data?.message ||
-              "Registration failed. Please try again."
-          );
-        }
-
-        setPassword("");
-        setAuthMode("login");
-        router.replace(`/auth?mode=login${redirectQuery}`, { scroll: false });
 
         setStatusMessage({
           type: "success",
-          text: "Account created successfully! Please sign in to continue.",
+          text: "Account created successfully! Redirecting...",
         });
 
+        setTimeout(() => router.push(redirectTarget), 1000);
         return;
       }
 

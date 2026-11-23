@@ -132,10 +132,22 @@ export default function DashboardPage() {
     setProfileError(null)
 
     try {
+      let normalizedPhone = phone.trim()
+      const digits = normalizedPhone.replace(/\D/g, "")
+      if (digits.length === 10 && !normalizedPhone.startsWith("+")) {
+        normalizedPhone = `+91${digits}`
+      } else if (digits.length === 11 && digits.startsWith("0")) {
+        normalizedPhone = `+91${digits.slice(1)}`
+      } else if (digits.length === 12 && digits.startsWith("91") && !normalizedPhone.startsWith("+")) {
+        normalizedPhone = `+${digits}`
+      } else if (!normalizedPhone.startsWith("+") && digits.length >= 8) {
+        normalizedPhone = `+${digits}`
+      }
+
       const payload: Record<string, unknown> = {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
-        phone: phone.trim()
+        phone: normalizedPhone
       }
 
       if (institution.trim()) {

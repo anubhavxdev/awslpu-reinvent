@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { backendFetch, backendJson } from "@/lib/api/backend"
+import { backendFetch, formatFastApiError } from "@/lib/api/backend"
 import { setAuthCookies } from "@/lib/api/auth-cookies"
 import type { RegisterRequest, TokenResponse } from "@/types/auth"
 
@@ -12,7 +12,13 @@ export async function POST(request: Request) {
       body: JSON.stringify(body)
     })
 
-    const tokens = await backendJson<TokenResponse>(response)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null)
+      const message = formatFastApiError(errorData, "Registration failed")
+      return NextResponse.json({ detail: message }, { status: response.status })
+    }
+
+    const tokens = await response.json() as TokenResponse
 
     const result = NextResponse.json({
       success: true
@@ -26,7 +32,7 @@ export async function POST(request: Request) {
       {
         detail: error instanceof Error ? error.message : "Registration failed"
       },
-      { status: 400 }
+      { status: 500 }
     )
   }
 }

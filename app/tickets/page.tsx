@@ -46,6 +46,7 @@ export default function TicketsPage() {
   const [orderError, setOrderError] = useState<string | null>(null)
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const [pollingStatus, setPollingStatus] = useState<string>("")
+  const [isPaying, setIsPaying] = useState(false)
 
   useEffect(() => {
     async function fetchCategories() {
@@ -75,11 +76,10 @@ export default function TicketsPage() {
         const res = await fetch("/api/tickets")
         if (res.ok) {
           const data = await res.json()
-          if (data.tickets && data.tickets.length > 0) {
-            setExistingTicket(data.tickets[0])
-          } else {
-            setExistingTicket(null)
-          }
+          const validTicket = data.tickets?.find((t: Ticket) => t.status === "valid") || null
+          setExistingTicket(validTicket)
+        } else {
+          setExistingTicket(null)
         }
       } catch {
         setExistingTicket(null)
@@ -95,9 +95,8 @@ export default function TicketsPage() {
       const res = await fetch("/api/tickets", { cache: "no-store" })
       if (res.ok) {
         const data = await res.json()
-        if (data.tickets && data.tickets.length > 0) {
-          setExistingTicket(data.tickets[0])
-        }
+        const validTicket = data.tickets?.find((t: Ticket) => t.status === "valid") || null
+        setExistingTicket(validTicket)
       }
     } catch {
       // ignore; the dashboard will show the ticket
@@ -106,6 +105,21 @@ export default function TicketsPage() {
 
   const toggleSelectCategory = (categoryId: string) => {
     if (existingTicket) return
+    const cat = categories.find((c) => c.id === categoryId)
+    if (!cat) return
+    const now = new Date()
+    const salesStart = cat.sales_start ? new Date(cat.sales_start) : null
+    const salesEnd = cat.sales_end ? new Date(cat.sales_end) : null
+    const available = (cat.quantity ?? 0) - (cat.quantity_sold ?? 0) - (cat.quantity_reserved ?? 0)
+    if (
+      !cat.is_active ||
+      cat.quantity <= 0 ||
+      available <= 0 ||
+      (salesStart && now < salesStart) ||
+      (salesEnd && now > salesEnd)
+    ) {
+      return
+    }
     setSelectedCategoryId((prev) => (prev === categoryId ? null : categoryId))
   }
 
@@ -127,6 +141,8 @@ export default function TicketsPage() {
   }
 
   const handleProceedPayment = async () => {
+    if (isPaying) return
+
     if (!authenticated) {
       router.push("/auth?mode=login&redirect=/tickets")
       return
@@ -140,6 +156,8 @@ export default function TicketsPage() {
       setOrderError("Please select a pass tier.")
       return
     }
+
+    setIsPaying(true)
 
     try {
       const profileRes = await fetch("/api/auth/me", { cache: "no-store" })
@@ -164,38 +182,49 @@ export default function TicketsPage() {
         router.push("/dashboard?tab=profile&checkout=profile-incomplete")
         return
       }
-    } catch (error) {
-      setOrderError(error instanceof Error ? error.message : "Unable to verify your profile.")
-      return
-    }
 
-    setOrderError(null)
-    setCheckoutStep("processing")
-    setPollingStatus("Reserving ticket...")
+      setOrderError(null)
+      setCheckoutStep("processing")
+      setPollingStatus("Reserving ticket...")
 
-    try {
-      const orderPayload = {
-        items: [
-          {
-            category_id: selectedCategoryId,
-            quantity: 1
-          }
-        ]
+      let order: Order | null = null
+      const isPendingValid =
+        createdOrder &&
+        createdOrder.status === "pending" &&
+        createdOrder.items?.some((item) => item.category_id === selectedCategoryId) &&
+        createdOrder.expires_at &&
+        new Date(createdOrder.expires_at).getTime() > Date.now() + 15000
+
+      if (isPendingValid) {
+        order = createdOrder
+      } else {
+        const orderPayload = {
+          items: [
+            {
+              category_id: selectedCategoryId,
+              quantity: 1
+            }
+          ]
+        }
+
+        const orderRes = await fetch("/api/orders", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(orderPayload)
+        })
+
+        if (!orderRes.ok) {
+          const errorData = await orderRes.json().catch(() => null)
+          throw new Error(errorData?.detail || "Could not reserve ticket. Please try again.")
+        }
+
+        order = await orderRes.json()
+        setCreatedOrder(order)
       }
 
-      const orderRes = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderPayload)
-      })
-
-      if (!orderRes.ok) {
-        const errorData = await orderRes.json().catch(() => null)
-        throw new Error(errorData?.detail || "Could not reserve ticket. Please try again.")
+      if (!order) {
+        throw new Error("Order creation failed. Please try again.")
       }
-
-      const order: Order = await orderRes.json()
-      setCreatedOrder(order)
 
       setPollingStatus("Opening Razorpay payment gateway...")
 
@@ -233,7 +262,7 @@ export default function TicketsPage() {
 
       setPollingStatus("Confirming payment & issuing digital ticket...")
       let attempts = 0
-      const maxAttempts = 12
+      const maxAttempts = 15
 
       while (attempts < maxAttempts) {
         attempts++
@@ -248,11 +277,28 @@ export default function TicketsPage() {
               return
             }
             if (checkData.status === "failed") {
-              throw new Error("Payment was rejected by gateway.")
+              setCreatedOrder(null)
+              throw new Error("Payment was rejected or marked failed by the gateway.")
+            }
+            if (checkData.status === "cancelled") {
+              setCreatedOrder(null)
+              throw new Error("The order reservation was cancelled.")
+            }
+            if (checkData.status === "expired") {
+              setCreatedOrder(null)
+              throw new Error("The order reservation has expired. Please select a pass and try again.")
             }
           }
         } catch (pollErr) {
           if (attempts >= maxAttempts) throw pollErr
+          if (
+            pollErr instanceof Error &&
+            (pollErr.message.includes("rejected") ||
+              pollErr.message.includes("cancelled") ||
+              pollErr.message.includes("expired"))
+          ) {
+            throw pollErr
+          }
         }
         await new Promise((resolve) => setTimeout(resolve, 2000))
       }
@@ -267,6 +313,8 @@ export default function TicketsPage() {
     } catch (err) {
       setOrderError(err instanceof Error ? err.message : "Payment processing encountered an issue.")
       setCheckoutStep("review")
+    } finally {
+      setIsPaying(false)
     }
   }
 
@@ -372,8 +420,35 @@ export default function TicketsPage() {
                       ? cat.is_recommended
                       : idx === 1 || cat.name.toLowerCase().includes("builder")
                   const isSelected = selectedCategoryId === cat.id
-                  const available = (cat.quantity || 100) - (cat.quantity_sold || 0)
-                  const isSoldOut = available <= 0
+
+                  const now = new Date()
+                  const salesStart = cat.sales_start ? new Date(cat.sales_start) : null
+                  const salesEnd = cat.sales_end ? new Date(cat.sales_end) : null
+                  const isUpcoming = salesStart ? now < salesStart : false
+                  const isExpired = salesEnd ? now > salesEnd : false
+
+                  const totalQty = cat.quantity ?? 0
+                  const soldQty = cat.quantity_sold ?? 0
+                  const reservedQty = cat.quantity_reserved ?? 0
+                  const available = totalQty - soldQty - reservedQty
+                  const isSoldOut = totalQty <= 0 || available <= 0
+                  const isUnavailable = isSoldOut || isUpcoming || isExpired || !cat.is_active
+
+                  let statusText = "Available"
+                  let subStatusText = "Instant Digital Issuance"
+                  if (!cat.is_active) {
+                    statusText = "Inactive"
+                    subStatusText = "Unavailable"
+                  } else if (isUpcoming) {
+                    statusText = "Coming Soon"
+                    subStatusText = `Opens ${salesStart?.toLocaleDateString("en-IN", { month: "short", day: "numeric" })}`
+                  } else if (isExpired) {
+                    statusText = "Registration Closed"
+                    subStatusText = "Sales Ended"
+                  } else if (isSoldOut) {
+                    statusText = "0 Left"
+                    subStatusText = "Sold Out"
+                  }
 
                   return (
                     <div
@@ -419,19 +494,19 @@ export default function TicketsPage() {
                         <div className="mb-6 flex items-center justify-between border-y border-white/10 py-3 text-xs text-white/50">
                           <span className="flex items-center gap-1.5">
                             <Clock className="h-3.5 w-3.5 text-[#FF2D87]" />
-                            {isSoldOut ? "Sold Out" : "Instant Digital Issuance"}
+                            {subStatusText}
                           </span>
-                          <span className={isSoldOut ? "text-red-400" : "text-emerald-400"}>
-                            {isSoldOut ? "0 Left" : "Available"}
+                          <span className={isUnavailable ? "text-red-400" : "text-emerald-400"}>
+                            {statusText}
                           </span>
                         </div>
 
                       </div>
 
                       <div className="mt-10 border-t border-white/10 pt-6">
-                        {isSoldOut ? (
-                          <div className="flex h-12 w-full items-center justify-center border border-white/15 bg-white/5 text-xs uppercase tracking-wider text-white/30">
-                            Pass Sold Out
+                        {isUnavailable ? (
+                          <div className="flex h-12 w-full items-center justify-center border border-white/15 bg-white/5 text-xs uppercase tracking-wider text-white/40">
+                            {isSoldOut ? "Pass Sold Out" : isUpcoming ? "Sales Not Started" : isExpired ? "Sales Ended" : "Unavailable"}
                           </div>
                         ) : existingTicket ? (
                           <div className="flex h-12 w-full items-center justify-center border border-white/10 bg-white/2 text-xs uppercase tracking-wider text-white/40">
@@ -601,11 +676,20 @@ export default function TicketsPage() {
               <button
                 type="button"
                 onClick={handleProceedPayment}
-                disabled={checkingExisting || !!existingTicket}
+                disabled={isPaying || checkingExisting || !!existingTicket}
                 className="flex h-14 disabled:cursor-not-allowed disabled:opacity-40 w-full items-center justify-center gap-3 bg-linear-to-r from-[#FF00D4] to-[#702cff] text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-[0_0_30px_rgba(255,0,212,0.3)] transition-all hover:opacity-95"
               >
-                <Lock className="h-4 w-4" />
-                <span>Pay ₹{totalAmount.toLocaleString("en-IN")} via Razorpay</span>
+                {isPaying ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Processing Reservation...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4" />
+                    <span>Pay ₹{totalAmount.toLocaleString("en-IN")} via Razorpay</span>
+                  </>
+                )}
               </button>
 
               <p className="text-center text-[10px] text-white/40">

@@ -22,7 +22,7 @@ export function LegalPage({
   sections,
 }: LegalPageProps) {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#050505] px-6 pb-24 pt-36 text-white sm:px-10 md:px-16 md:pt-44 lg:px-24">
+    <main className="relative min-h-screen overflow-hidden bg-[#050505] px-6 pb-24 pt-36 text-white sm:px-10 md:px-16 md:pt-44 lg:px-24">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(108,0,255,0.16),transparent_55%)]" />
 
       <div className="relative mx-auto max-w-4xl">
@@ -75,6 +75,6 @@ export function LegalPage({
           ))}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

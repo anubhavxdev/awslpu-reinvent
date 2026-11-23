@@ -104,8 +104,9 @@ export async function openRazorpayCheckout(
     })
 
     rzp.on("payment.failed", (response: unknown) => {
-      resolved = true
-      reject(new Error("Payment failed or was rejected by bank"))
+      // Don't reject on first failure; user can retry payment within the Razorpay modal.
+      // The promise rejects only when modal is closed (ondismiss).
+      console.warn("Razorpay payment attempt failed (user can retry in modal):", response)
     })
 
     rzp.open()

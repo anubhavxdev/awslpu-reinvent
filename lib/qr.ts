@@ -11,6 +11,10 @@ export function generateQrMatrix(text: string): boolean[][] {
     }
   }
 
+  if (length > capacityM[10]) {
+    throw new Error("Text too long for QR code version 1-10")
+  }
+
   const size = version * 4 + 17
   const matrix: (boolean | null)[][] = Array.from({ length: size }, () =>
     Array(size).fill(null)
@@ -100,9 +104,47 @@ export function generateQrMatrix(text: string): boolean[][] {
     setReserved(size - 1 - i, 8, false)
   }
 
-  const totalCodewords = [0, 26, 44, 70, 100, 134, 172, 196, 242, 292, 346][version]
-  const ecCodewords = [0, 10, 16, 26, 36, 48, 64, 72, 88, 110, 130][version]
-  const dataCodewordsCount = totalCodewords - ecCodewords
+  const versionInfo: Record<number, number> = {
+    7: 0x07c94,
+    8: 0x085bc,
+    9: 0x09a99,
+    10: 0x0a4d3
+  }
+
+  if (version >= 7) {
+    const vBits = versionInfo[version]
+    for (let i = 0; i < 18; i++) {
+      const bit = ((vBits >> i) & 1) === 1
+      const r = Math.floor(i / 3)
+      const c = i % 3
+      setReserved(r, size - 11 + c, bit)
+      setReserved(size - 11 + c, r, bit)
+    }
+  }
+
+  interface VersionSpec {
+    ecPerBlock: number
+    g1Blocks: number
+    g1DataCodewords: number
+    g2Blocks: number
+    g2DataCodewords: number
+  }
+
+  const VERSION_SPECS: Record<number, VersionSpec> = {
+    1: { ecPerBlock: 10, g1Blocks: 1, g1DataCodewords: 16, g2Blocks: 0, g2DataCodewords: 0 },
+    2: { ecPerBlock: 16, g1Blocks: 1, g1DataCodewords: 28, g2Blocks: 0, g2DataCodewords: 0 },
+    3: { ecPerBlock: 26, g1Blocks: 1, g1DataCodewords: 44, g2Blocks: 0, g2DataCodewords: 0 },
+    4: { ecPerBlock: 18, g1Blocks: 2, g1DataCodewords: 32, g2Blocks: 0, g2DataCodewords: 0 },
+    5: { ecPerBlock: 24, g1Blocks: 2, g1DataCodewords: 43, g2Blocks: 0, g2DataCodewords: 0 },
+    6: { ecPerBlock: 16, g1Blocks: 4, g1DataCodewords: 27, g2Blocks: 0, g2DataCodewords: 0 },
+    7: { ecPerBlock: 18, g1Blocks: 4, g1DataCodewords: 31, g2Blocks: 0, g2DataCodewords: 0 },
+    8: { ecPerBlock: 22, g1Blocks: 2, g1DataCodewords: 38, g2Blocks: 2, g2DataCodewords: 39 },
+    9: { ecPerBlock: 22, g1Blocks: 3, g1DataCodewords: 36, g2Blocks: 2, g2DataCodewords: 37 },
+    10: { ecPerBlock: 26, g1Blocks: 4, g1DataCodewords: 43, g2Blocks: 1, g2DataCodewords: 44 },
+  }
+
+  const spec = VERSION_SPECS[version]
+  const totalDataCodewords = spec.g1Blocks * spec.g1DataCodewords + spec.g2Blocks * spec.g2DataCodewords
 
   const bits: number[] = []
   function pushBits(val: number, numBits: number) {
@@ -112,12 +154,12 @@ export function generateQrMatrix(text: string): boolean[][] {
   }
 
   pushBits(0b0100, 4)
-  pushBits(length, 8)
+  pushBits(length, version < 10 ? 8 : 16)
   for (let i = 0; i < length; i++) {
     pushBits(dataBytes[i], 8)
   }
 
-  const maxDataBits = dataCodewordsCount * 8
+  const maxDataBits = totalDataCodewords * 8
   const terminatorLength = Math.min(4, maxDataBits - bits.length)
   pushBits(0, terminatorLength)
 
@@ -171,18 +213,48 @@ export function generateQrMatrix(text: string): boolean[][] {
     return poly
   }
 
-  const genPoly = getGeneratorPoly(ecCodewords)
-  const remainder = new Array(ecCodewords).fill(0)
-  for (let i = 0; i < dataBlocks.length; i++) {
-    const factor = dataBlocks[i] ^ remainder[0]
-    remainder.shift()
-    remainder.push(0)
-    for (let j = 0; j < ecCodewords; j++) {
-      remainder[j] ^= gfMul(genPoly[j + 1], factor)
+  const rawBlocks: number[][] = []
+  let offset = 0
+  for (let i = 0; i < spec.g1Blocks; i++) {
+    rawBlocks.push(dataBlocks.slice(offset, offset + spec.g1DataCodewords))
+    offset += spec.g1DataCodewords
+  }
+  for (let i = 0; i < spec.g2Blocks; i++) {
+    rawBlocks.push(dataBlocks.slice(offset, offset + spec.g2DataCodewords))
+    offset += spec.g2DataCodewords
+  }
+
+  const genPoly = getGeneratorPoly(spec.ecPerBlock)
+  const ecBlocks: number[][] = []
+  for (const b of rawBlocks) {
+    const remainder = new Array(spec.ecPerBlock).fill(0)
+    for (let i = 0; i < b.length; i++) {
+      const factor = b[i] ^ remainder[0]
+      remainder.shift()
+      remainder.push(0)
+      for (let j = 0; j < spec.ecPerBlock; j++) {
+        remainder[j] ^= gfMul(genPoly[j + 1], factor)
+      }
+    }
+    ecBlocks.push(remainder)
+  }
+
+  const finalCodewords: number[] = []
+  const maxDataLen = Math.max(spec.g1DataCodewords, spec.g2DataCodewords)
+  for (let i = 0; i < maxDataLen; i++) {
+    for (let b = 0; b < rawBlocks.length; b++) {
+      if (i < rawBlocks[b].length) {
+        finalCodewords.push(rawBlocks[b][i])
+      }
     }
   }
 
-  const finalCodewords = [...dataBlocks, ...remainder]
+  for (let i = 0; i < spec.ecPerBlock; i++) {
+    for (let b = 0; b < ecBlocks.length; b++) {
+      finalCodewords.push(ecBlocks[b][i])
+    }
+  }
+
   const finalBits: number[] = []
   for (const b of finalCodewords) {
     for (let i = 7; i >= 0; i--) {

@@ -50,7 +50,7 @@ export function FeaturedSpeakers() {
           </div>
 
           <Link
-            href="/schedule#speakers"
+            href="/speakers"
             className="group inline-flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.15em] text-white/80 transition-colors hover:text-[#FF2D87]"
           >
             Meet All Speakers

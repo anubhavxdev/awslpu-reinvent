@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { backendFetch, backendJson } from "@/lib/api/backend"
-import { getAuthCookies } from "@/lib/api/auth-cookies"
+import { authenticatedBackendFetch, backendJson, formatFastApiError } from "@/lib/api/backend"
+import { setAuthCookies } from "@/lib/api/auth-cookies"
 import type { AuthUser } from "@/types/auth"
 import type { Order } from "@/types/ticketing"
 
@@ -10,22 +10,13 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { accessToken } = getAuthCookies(request)
   const { id } = await params
-
-  if (!accessToken) {
-    return NextResponse.json(
-      { detail: "Authentication required" },
-      { status: 401 }
-    )
-  }
 
   // Handle /api/orders/analytics
   if (id.toLowerCase() === "analytics") {
     try {
-      const userRes = await backendFetch("/api/v1/users/me", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
+      const { response: userRes, refreshedTokens: userRefresh } =
+        await authenticatedBackendFetch(request, "/api/v1/users/me")
 
       if (!userRes.ok) {
         return NextResponse.json(
@@ -47,20 +38,27 @@ export async function GET(
       }
 
       const url = new URL(request.url)
-      const response = await backendFetch(`/api/v1/orders/analytics${url.search}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
+      const { response, refreshedTokens } = await authenticatedBackendFetch(
+        request,
+        `/api/v1/orders/analytics${url.search}`
+      )
 
       if (!response.ok) {
         const err = await response.json().catch(() => null)
-        return NextResponse.json(
-          { detail: err?.detail || "Failed to fetch analytics" },
-          { status: response.status }
-        )
+        const msg = formatFastApiError(err, "Failed to fetch analytics")
+        const res = NextResponse.json({ detail: msg }, { status: response.status })
+        if (refreshedTokens || userRefresh) {
+          setAuthCookies(res, (refreshedTokens || userRefresh)!)
+        }
+        return res
       }
 
       const data = await backendJson(response)
-      return NextResponse.json(data)
+      const res = NextResponse.json(data)
+      if (refreshedTokens || userRefresh) {
+        setAuthCookies(res, (refreshedTokens || userRefresh)!)
+      }
+      return res
     } catch (error) {
       return NextResponse.json(
         { detail: error instanceof Error ? error.message : "Internal error" },
@@ -72,9 +70,8 @@ export async function GET(
   // Handle /api/orders/all
   if (id.toLowerCase() === "all") {
     try {
-      const userRes = await backendFetch("/api/v1/users/me", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
+      const { response: userRes, refreshedTokens: userRefresh } =
+        await authenticatedBackendFetch(request, "/api/v1/users/me")
 
       if (!userRes.ok) {
         return NextResponse.json(
@@ -96,20 +93,27 @@ export async function GET(
       }
 
       const url = new URL(request.url)
-      const response = await backendFetch(`/api/v1/orders/all${url.search}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
+      const { response, refreshedTokens } = await authenticatedBackendFetch(
+        request,
+        `/api/v1/orders/all${url.search}`
+      )
 
       if (!response.ok) {
         const err = await response.json().catch(() => null)
-        return NextResponse.json(
-          { detail: err?.detail || "Failed to fetch orders" },
-          { status: response.status }
-        )
+        const msg = formatFastApiError(err, "Failed to fetch orders")
+        const res = NextResponse.json({ detail: msg }, { status: response.status })
+        if (refreshedTokens || userRefresh) {
+          setAuthCookies(res, (refreshedTokens || userRefresh)!)
+        }
+        return res
       }
 
       const data = await backendJson(response)
-      return NextResponse.json(data)
+      const res = NextResponse.json(data)
+      if (refreshedTokens || userRefresh) {
+        setAuthCookies(res, (refreshedTokens || userRefresh)!)
+      }
+      return res
     } catch (error) {
       return NextResponse.json(
         { detail: error instanceof Error ? error.message : "Internal error" },
@@ -120,14 +124,8 @@ export async function GET(
 
   // Retrieve single order with ownership and role verification
   try {
-    const [userRes, orderRes] = await Promise.all([
-      backendFetch("/api/v1/users/me", {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      }),
-      backendFetch(`/api/v1/orders/${id}`, {
-        headers: { Authorization: `Bearer ${accessToken}` }
-      })
-    ])
+    const { response: userRes, refreshedTokens: userRefresh } =
+      await authenticatedBackendFetch(request, "/api/v1/users/me")
 
     if (!userRes.ok) {
       return NextResponse.json(
@@ -136,12 +134,19 @@ export async function GET(
       )
     }
 
+    const { response: orderRes, refreshedTokens: orderRefresh } =
+      await authenticatedBackendFetch(request, `/api/v1/orders/${id}`)
+
+    const tokensToSet = orderRefresh || userRefresh
+
     if (!orderRes.ok) {
       const err = await orderRes.json().catch(() => null)
-      return NextResponse.json(
-        { detail: err?.detail || "Order not found" },
-        { status: orderRes.status }
-      )
+      const msg = formatFastApiError(err, "Order not found")
+      const res = NextResponse.json({ detail: msg }, { status: orderRes.status })
+      if (tokensToSet) {
+        setAuthCookies(res, tokensToSet)
+      }
+      return res
     }
 
     const user: AuthUser = await userRes.json()
@@ -151,7 +156,6 @@ export async function GET(
       ALLOWED_ROLES.includes(r.toLowerCase())
     )
 
-    // Allowed if user is staff (volunteer, organizer, admin) OR the owner of the order
     if (!isStaff && order.user_id !== user.id) {
       return NextResponse.json(
         { detail: "You do not have permission to access this order" },
@@ -159,7 +163,11 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(order)
+    const res = NextResponse.json(order)
+    if (tokensToSet) {
+      setAuthCookies(res, tokensToSet)
+    }
+    return res
   } catch (error) {
     return NextResponse.json(
       { detail: error instanceof Error ? error.message : "Internal error" },

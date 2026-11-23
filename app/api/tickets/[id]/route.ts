@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
-import { backendFetch, backendJson } from "@/lib/api/backend"
-import { getAuthCookies } from "@/lib/api/auth-cookies"
+import { authenticatedBackendFetch, backendJson, formatFastApiError } from "@/lib/api/backend"
+import { setAuthCookies } from "@/lib/api/auth-cookies"
 import type { AuthUser } from "@/types/auth"
 import type { Ticket } from "@/types/ticketing"
 
@@ -10,24 +10,13 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { accessToken } = getAuthCookies(request)
   const { id } = await params
-
-  if (!accessToken) {
-    return NextResponse.json(
-      { detail: "Authentication required" },
-      { status: 401 }
-    )
-  }
 
   // If id is "all", restrict to volunteer, organizer, admin
   if (id.toLowerCase() === "all") {
     try {
-      const userRes = await backendFetch("/api/v1/users/me", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      })
+      const { response: userRes, refreshedTokens: userRefresh } =
+        await authenticatedBackendFetch(request, "/api/v1/users/me")
 
       if (!userRes.ok) {
         return NextResponse.json(
@@ -49,22 +38,27 @@ export async function GET(
       }
 
       const url = new URL(request.url)
-      const response = await backendFetch(`/api/v1/tickets/all${url.search}`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      })
+      const { response, refreshedTokens } = await authenticatedBackendFetch(
+        request,
+        `/api/v1/tickets/all${url.search}`
+      )
 
       if (!response.ok) {
         const err = await response.json().catch(() => null)
-        return NextResponse.json(
-          { detail: err?.detail || "Failed to fetch tickets" },
-          { status: response.status }
-        )
+        const msg = formatFastApiError(err, "Failed to fetch tickets")
+        const res = NextResponse.json({ detail: msg }, { status: response.status })
+        if (refreshedTokens || userRefresh) {
+          setAuthCookies(res, (refreshedTokens || userRefresh)!)
+        }
+        return res
       }
 
       const data = await backendJson(response)
-      return NextResponse.json(data)
+      const res = NextResponse.json(data)
+      if (refreshedTokens || userRefresh) {
+        setAuthCookies(res, (refreshedTokens || userRefresh)!)
+      }
+      return res
     } catch (error) {
       return NextResponse.json(
         { detail: error instanceof Error ? error.message : "Internal error" },
@@ -74,22 +68,27 @@ export async function GET(
   }
 
   try {
-    const response = await backendFetch(`/api/v1/tickets/${id}`, {
-      headers: {
-        Authorization: `Bearer ${accessToken}`
-      }
-    })
+    const { response, refreshedTokens } = await authenticatedBackendFetch(
+      request,
+      `/api/v1/tickets/${id}`
+    )
 
     if (!response.ok) {
       const err = await response.json().catch(() => null)
-      return NextResponse.json(
-        { detail: err?.detail || "Ticket not found" },
-        { status: response.status }
-      )
+      const msg = formatFastApiError(err, "Ticket not found")
+      const res = NextResponse.json({ detail: msg }, { status: response.status })
+      if (refreshedTokens) {
+        setAuthCookies(res, refreshedTokens)
+      }
+      return res
     }
 
     const data = await backendJson<Ticket>(response)
-    return NextResponse.json(data)
+    const res = NextResponse.json(data)
+    if (refreshedTokens) {
+      setAuthCookies(res, refreshedTokens)
+    }
+    return res
   } catch (error) {
     return NextResponse.json(
       { detail: error instanceof Error ? error.message : "Internal error" },

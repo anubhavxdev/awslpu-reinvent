@@ -15,8 +15,8 @@ export function QrCode({
   value,
   size = 220,
   className = "",
-  fgColor = "#ffffff",
-  bgColor = "transparent"
+  fgColor = "#000000",
+  bgColor = "#ffffff"
 }: QrCodeProps) {
   const { path, matrixSize } = useMemo(() => {
     try {
@@ -32,23 +32,21 @@ export function QrCode({
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center p-3 rounded-xl border border-white/10 bg-black/60 shadow-[0_0_30px_rgba(255,0,212,0.1)] backdrop-blur-md ${className}`}
+      className={`relative inline-flex items-center justify-center p-3 rounded-xl border border-white/20 bg-white shadow-[0_0_30px_rgba(255,255,255,0.15)] ${className}`}
       style={{ width: size, height: size }}
     >
       <svg
-        viewBox={`-2 -2 ${matrixSize + 4} ${matrixSize + 4}`}
+        viewBox={`-4 -4 ${matrixSize + 8} ${matrixSize + 8}`}
         className="w-full h-full"
         style={{ shapeRendering: "crispEdges" }}
       >
-        {bgColor !== "transparent" && (
-          <rect
-            x={-2}
-            y={-2}
-            width={matrixSize + 4}
-            height={matrixSize + 4}
-            fill={bgColor}
-          />
-        )}
+        <rect
+          x={-4}
+          y={-4}
+          width={matrixSize + 8}
+          height={matrixSize + 8}
+          fill={bgColor}
+        />
         <path d={path} fill={fgColor} />
       </svg>
     </div>

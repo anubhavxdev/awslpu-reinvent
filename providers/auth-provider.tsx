@@ -37,32 +37,57 @@ async function getError(response: Response) {
   )
 }
 
+let activeRefreshPromise: Promise<AuthUser | null> | null = null
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   const refreshUser = useCallback(async () => {
-    try {
-      const response = await fetch("/api/auth/me", {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store"
-      })
+    if (activeRefreshPromise) {
+      return activeRefreshPromise
+    }
 
-      if (!response.ok) {
+    activeRefreshPromise = (async () => {
+      try {
+        let response = await fetch("/api/auth/me", {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store"
+        })
+
+        if (response.status === 401) {
+          const refreshRes = await fetch("/api/auth/refresh", {
+            method: "POST",
+            credentials: "include",
+            cache: "no-store"
+          })
+          if (refreshRes.ok) {
+            response = await fetch("/api/auth/me", {
+              method: "GET",
+              credentials: "include",
+              cache: "no-store"
+            })
+          }
+        }
+
+        if (!response.ok) {
+          setUser(null)
+          return null
+        }
+
+        const data = await response.json()
+        setUser(data.user)
+        return data.user as AuthUser
+      } catch {
         setUser(null)
         return null
+      } finally {
+        activeRefreshPromise = null
       }
+    })()
 
-      const data = await response.json()
-
-      setUser(data.user)
-
-      return data.user as AuthUser
-    } catch {
-      setUser(null)
-      return null
-    }
+    return activeRefreshPromise
   }, [])
 
   const login = useCallback(async (credentials: LoginRequest) => {
@@ -127,21 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     async function initialize() {
       try {
-        const response = await fetch("/api/auth/me", {
-          credentials: "include",
-          cache: "no-store"
-        })
-
-        if (!response.ok) {
-          if (active) setUser(null)
-          return
-        }
-
-        const data = await response.json()
-
-        if (active) {
-          setUser(data.user)
-        }
+        const currentUser = await refreshUser()
+        if (!active) return
+        setUser(currentUser)
       } catch {
         if (active) setUser(null)
       } finally {
@@ -154,7 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       active = false
     }
-  }, [])
+  }, [refreshUser])
 
   return (
     <AuthContext.Provider
