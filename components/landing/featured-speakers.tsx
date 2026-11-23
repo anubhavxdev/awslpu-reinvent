@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { ArrowUpRight } from "lucide-react"
+import { ArrowUpRight, Sparkles, Users } from "lucide-react"
 import { LinkedinIcon } from "@/components/icons"
 import type { Speaker } from "@/types/schedule"
 
@@ -28,51 +28,66 @@ export function FeaturedSpeakers() {
   }, [])
 
   return (
-    <section className="relative overflow-hidden bg-[#050505] px-6 py-20 text-white sm:px-10 lg:px-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_80%_40%,rgba(255,0,212,0.07),transparent_50%)]" />
+    <section className="relative isolate overflow-hidden bg-[#050505] px-6 py-24 text-white sm:px-10 lg:px-16 lg:py-32">
+      {/* Top glowing separator beam */}
+      <div className="pointer-events-none absolute -top-px left-1/2 -translate-x-1/2 h-px w-3/4 max-w-5xl bg-linear-to-r from-transparent via-[#FF00D4] to-transparent shadow-[0_0_25px_#FF00D4]" />
+
+      {/* Atmospheric lighting effects */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[500px] w-[850px] rounded-full bg-[#FF00D4]/14 blur-[150px]" />
+      <div className="pointer-events-none absolute bottom-0 right-10 h-[450px] w-[550px] rounded-full bg-[#6C00FF]/16 blur-[140px]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.04)_1px,transparent_1px)] [background-size:28px_28px] opacity-70" />
 
       <div className="relative mx-auto max-w-[1600px]">
-        <div className="flex flex-col justify-between gap-6 border-b border-white/10 pb-10 sm:flex-row sm:items-end">
+        {/* Section header */}
+        <div className="flex flex-col justify-between gap-8 border-b border-white/10 pb-12 sm:flex-row sm:items-end">
           <div>
-            <div className="mb-4 flex items-center gap-3">
-              <span className="h-px w-8 bg-[#FF2D87]" />
-              <span className="text-xs uppercase tracking-[0.22em] text-[#FF2D87]">
-                Visionaries & Builders
+            <div className="mb-4 inline-flex items-center gap-2.5 rounded-full border border-[#FF00D4]/40 bg-[#FF00D4]/10 px-3.5 py-1 backdrop-blur-md shadow-[0_0_20px_rgba(255,0,212,0.2)]">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF00D4] opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[#FF00D4]" />
+              </span>
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#FF80DF]">
+                Official 2026 Lineup
               </span>
             </div>
 
-            <h2 className="text-4xl font-light tracking-[-0.06em] sm:text-6xl">
-              Learn from the{" "}
-              <span className="bg-linear-to-r from-[#FF2D87] via-[#FF00D4] to-[#8B5CFF] bg-clip-text text-transparent">
-                masters.
+            <h2 className="text-4xl font-light tracking-[-0.06em] sm:text-6xl lg:text-7xl">
+              World-class minds{" "}
+              <span className="bg-linear-to-r from-[#FF2D87] via-[#FF00D4] to-[#8B5CFF] bg-clip-text text-transparent font-normal">
+                on stage.
               </span>
             </h2>
+
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-white/60 sm:text-base">
+              Learn directly from cloud architects, AWS community leaders, and distributed systems engineers shaping the modern cloud frontier.
+            </p>
           </div>
 
           <Link
             href="/speakers"
-            className="group inline-flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.15em] text-white/80 transition-colors hover:text-[#FF2D87]"
+            className="group inline-flex items-center gap-3 self-start rounded-full border border-[#FF00D4]/50 bg-[#FF00D4]/10 px-6 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow-[0_0_25px_rgba(255,0,212,0.25)] backdrop-blur-md transition-all duration-300 hover:border-[#FF00D4] hover:bg-[#FF00D4] hover:shadow-[0_0_35px_rgba(255,0,212,0.5)] sm:self-end"
           >
-            Meet All Speakers
-            <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 text-[#FF2D87]" />
+            <span>Explore All Speakers</span>
+            <ArrowUpRight className="h-4 w-4 text-[#FF80DF] transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" />
           </Link>
         </div>
 
+        {/* Speaker cards */}
         {loading ? (
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[...Array(4)].map((_, i) => (
               <div
                 key={i}
-                className="h-80 animate-pulse border border-white/5 bg-white/[0.02]"
+                className="h-96 animate-pulse rounded-xl border border-white/10 bg-white/[0.02]"
               />
             ))}
           </div>
         ) : speakers.length === 0 ? (
-          <div className="mt-12 flex flex-col items-center justify-center border border-white/10 bg-white/[0.01] py-16 text-center">
+          <div className="mt-12 flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-linear-to-b from-white/[0.03] to-transparent py-20 text-center shadow-[0_0_50px_rgba(255,0,212,0.08)]">
             <span className="text-xs uppercase tracking-widest text-[#FF00D4]">
               Speaker Lineup
             </span>
-            <h3 className="mt-2 text-xl font-light text-white">
+            <h3 className="mt-2 text-2xl font-light text-white">
               Announcements Coming Soon
             </h3>
             <p className="mt-2 max-w-md text-xs text-white/50">
@@ -84,40 +99,48 @@ export function FeaturedSpeakers() {
             {speakers.slice(0, 3).map((spk) => (
               <article
                 key={spk.id}
-                className="group relative flex flex-col justify-between overflow-hidden border border-white/10 bg-white/[0.02] p-6 transition-all duration-300 hover:border-[#FF00D4]/70 hover:shadow-[0_0_30px_rgba(255,0,212,0.12)]"
+                className="group relative flex flex-col justify-between overflow-hidden rounded-xl border border-white/15 bg-linear-to-b from-white/[0.05] via-[#090614] to-[#04020a] p-6 shadow-xl backdrop-blur-md transition-all duration-500 hover:-translate-y-1 hover:border-[#FF00D4] hover:shadow-[0_0_40px_rgba(255,0,212,0.35),0_0_80px_rgba(108,0,255,0.2)]"
               >
+                {/* Top glowing hover beam */}
+                <div className="pointer-events-none absolute top-0 inset-x-0 h-0.5 bg-linear-to-r from-transparent via-[#FF00D4]/40 to-transparent transition-all duration-300 group-hover:h-1 group-hover:via-[#FF00D4]" />
+                <div className="pointer-events-none absolute -top-12 -right-12 h-28 w-28 rounded-full bg-[#FF00D4]/10 blur-2xl transition-all duration-500 group-hover:bg-[#FF00D4]/25" />
+
                 <div>
-                  <div className="relative aspect-square w-full overflow-hidden rounded-md border border-white/10 bg-white/[0.05]">
+                  {/* Photo container */}
+                  <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-white/15 bg-white/[0.05] transition-all duration-500 group-hover:border-[#FF00D4]/60 group-hover:shadow-[0_0_25px_rgba(255,0,212,0.25)]">
                     {spk.profile_picture ? (
                       <img
                         src={spk.profile_picture}
                         alt={spk.full_name}
-                        className="h-full w-full object-cover grayscale contrast-125 transition-all duration-500 group-hover:grayscale-0 group-hover:scale-105"
+                        className="h-full w-full object-cover grayscale contrast-125 transition-all duration-700 group-hover:scale-105 group-hover:grayscale-0"
                       />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-white/5 text-2xl font-light text-white/40">
+                      <div className="flex h-full w-full items-center justify-center bg-white/5 text-3xl font-light text-white/40">
                         {spk.full_name.charAt(0)}
                       </div>
                     )}
-                    <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent" />
-                  </div>
+                    <div className="pointer-events-none absolute inset-0 bg-linear-to-t from-black/85 via-transparent to-transparent" />
 
-                  <div className="mt-5">
                     {spk.company && (
-                      <span className="text-[10px] uppercase tracking-wider text-[#FF00D4]">
+                      <span className="absolute bottom-3 left-3 rounded border border-[#FF00D4]/50 bg-black/85 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#FF80DF] backdrop-blur-md shadow-lg">
                         {spk.company}
                       </span>
                     )}
-                    <h3 className="mt-1 text-xl font-medium tracking-tight text-white group-hover:text-[#FF2D87] transition-colors">
+                  </div>
+
+                  <div className="mt-5">
+                    <h3 className="text-xl font-semibold tracking-tight text-white transition-colors duration-200 group-hover:text-[#FF80DF]">
                       {spk.full_name}
                     </h3>
-                    <p className="mt-1 text-xs text-white/55">{spk.designation}</p>
+                    <p className="mt-1 text-xs text-white/60 font-medium">
+                      {spk.designation}
+                    </p>
                   </div>
                 </div>
 
-                <div className="mt-6 border-t border-white/10 pt-4 flex items-center justify-between">
-                  <span className="text-[10px] text-white/40 tracking-wide line-clamp-1">
-                    {spk.topics?.join(" · ") || "Keynote Session"}
+                <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4">
+                  <span className="text-[10px] uppercase tracking-wider text-white/40 line-clamp-1 font-mono">
+                    {spk.topics?.[0] ? `#${spk.topics[0]}` : "#CloudArchitecture"}
                   </span>
                   {spk.socials?.linkedin ? (
                     <a
@@ -125,7 +148,7 @@ export function FeaturedSpeakers() {
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label={`${spk.full_name} LinkedIn`}
-                      className="text-white/40 hover:text-white transition-colors"
+                      className="rounded p-1 text-white/40 transition-colors hover:bg-white/10 hover:text-white"
                     >
                       <LinkedinIcon className="h-4 w-4" />
                     </a>
@@ -134,47 +157,57 @@ export function FeaturedSpeakers() {
               </article>
             ))}
 
-            {/* View All Card */}
+            {/* High-visibility View All Card */}
             <Link
               href="/speakers"
-              className="group relative flex flex-col justify-between overflow-hidden border border-[#FF00D4]/40 bg-linear-to-b from-[#FF00D4]/10 via-[#8B5CFF]/5 to-[#050505] p-6 transition-all duration-300 hover:border-[#FF00D4] hover:shadow-[0_0_35px_rgba(255,0,212,0.25)]"
+              className="group relative flex flex-col justify-between overflow-hidden rounded-xl border-2 border-[#FF00D4]/70 bg-linear-to-b from-[#FF00D4]/20 via-[#6C00FF]/15 to-[#080512] p-6 shadow-[0_0_40px_rgba(255,0,212,0.22)] backdrop-blur-xl transition-all duration-500 hover:-translate-y-1 hover:border-[#FF00D4] hover:shadow-[0_0_60px_rgba(255,0,212,0.45),0_0_100px_rgba(108,0,255,0.3)]"
             >
-              <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#FF00D4]/15 blur-2xl transition-all duration-500 group-hover:scale-150 group-hover:bg-[#FF00D4]/25" />
+              {/* Radial glow pulse */}
+              <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-[#FF00D4]/25 blur-3xl transition-all duration-700 group-hover:scale-150 group-hover:bg-[#FF00D4]/40" />
 
               <div>
-                <div className="flex aspect-square w-full flex-col items-center justify-center rounded-md border border-white/10 bg-white/[0.03] transition-colors duration-300 group-hover:border-[#FF00D4]/40 group-hover:bg-[#FF00D4]/10">
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[#FF00D4] bg-[#FF00D4]/20 shadow-[0_0_20px_rgba(255,0,212,0.3)] transition-transform duration-300 group-hover:scale-110">
-                    <ArrowUpRight className="h-6 w-6 text-[#FF2D87] transition-transform duration-300 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-white" />
+                <div className="flex aspect-square w-full flex-col items-center justify-center rounded-lg border border-[#FF00D4]/40 bg-black/40 backdrop-blur-md transition-all duration-500 group-hover:border-[#FF00D4] group-hover:bg-[#FF00D4]/15">
+                  {/* Concentric radar rings icon */}
+                  <div className="relative flex h-20 w-20 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#FF00D4]/20 duration-1000" />
+                    <span className="absolute inline-flex h-16 w-16 rounded-full border border-[#FF00D4]/60 bg-[#FF00D4]/10 shadow-[0_0_25px_rgba(255,0,212,0.4)]" />
+                    <ArrowUpRight className="relative h-8 w-8 text-white transition-transform duration-500 group-hover:translate-x-1 group-hover:-translate-y-1 group-hover:scale-110" />
                   </div>
-                  <span className="mt-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#FF2D87]">
+
+                  <span className="mt-4 text-[11px] font-bold uppercase tracking-[0.24em] text-[#FF80DF]">
                     Full Lineup
                   </span>
-                  <span className="mt-1 text-xs text-white/50">
-                    {speakers.length > 3 ? `+${speakers.length - 3} more speakers` : "Explore roster"}
+                  <span className="mt-1 text-xs text-white/70">
+                    {speakers.length > 3
+                      ? `+${speakers.length - 3} more speakers`
+                      : "Explore all speakers"}
                   </span>
                 </div>
 
                 <div className="mt-5">
-                  <span className="text-[10px] uppercase tracking-wider text-[#FF00D4]">
-                    Festival Speakers
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[#FF80DF]">
+                    Re:Invent 2026
                   </span>
-                  <h3 className="mt-1 text-xl font-medium tracking-tight text-white transition-colors group-hover:text-[#FF2D87]">
-                    View All Speakers
+                  <h3 className="mt-1 text-xl font-semibold tracking-tight text-white transition-colors duration-200 group-hover:text-[#FF80DF]">
+                    Meet All Speakers
                   </h3>
-                  <p className="mt-1 text-xs text-white/55">
-                    Discover all cloud experts, architects, and visionaries joining Re:Invent Fest 2026.
+                  <p className="mt-1 text-xs text-white/60">
+                    Browse the complete roster of keynote speakers, panelists, and workshop hosts.
                   </p>
                 </div>
               </div>
 
-              <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4 text-xs font-semibold uppercase tracking-wider text-[#FF2D87] group-hover:text-white transition-colors">
-                <span>Browse All</span>
-                <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              <div className="mt-6 flex items-center justify-between border-t border-[#FF00D4]/30 pt-4 text-xs font-bold uppercase tracking-wider text-[#FF80DF] transition-colors group-hover:text-white">
+                <span>View Complete Roster</span>
+                <ArrowUpRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1 group-hover:-translate-y-1" />
               </div>
             </Link>
           </div>
         )}
       </div>
+
+      {/* Bottom subtle glow separator */}
+      <div className="pointer-events-none absolute -bottom-px left-1/2 -translate-x-1/2 h-px w-2/3 max-w-4xl bg-linear-to-r from-transparent via-[#8B5CFF]/60 to-transparent shadow-[0_0_20px_#8B5CFF]" />
     </section>
   )
 }
