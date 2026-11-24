@@ -10,6 +10,7 @@ export interface TicketCategory {
   sales_end: string
   is_active: boolean
   is_recommended?: boolean
+  is_sold_out?: boolean
 }
 
 export interface OrderItem {
