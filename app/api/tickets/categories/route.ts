@@ -16,7 +16,11 @@ export async function GET() {
 
     const data = await backendJson<TicketCategory[]>(response)
     if (Array.isArray(data)) {
-      return NextResponse.json(data)
+      return NextResponse.json(data, {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120"
+        }
+      })
     }
 
     return NextResponse.json([])

@@ -44,15 +44,33 @@ export interface RazorpayInstance {
   close: () => void
 }
 
-export function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (typeof window === "undefined") {
-      resolve(false)
-      return
-    }
+let scriptLoadingPromise: Promise<boolean> | null = null
 
-    if (window.Razorpay) {
-      resolve(true)
+export function loadRazorpayScript(): Promise<boolean> {
+  if (typeof window === "undefined") {
+    return Promise.resolve(false)
+  }
+
+  if (window.Razorpay) {
+    return Promise.resolve(true)
+  }
+
+  if (scriptLoadingPromise) {
+    return scriptLoadingPromise
+  }
+
+  scriptLoadingPromise = new Promise((resolve) => {
+    const existing = document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')
+    if (existing) {
+      if (window.Razorpay) {
+        resolve(true)
+      } else {
+        existing.addEventListener("load", () => resolve(true), { once: true })
+        existing.addEventListener("error", () => {
+          scriptLoadingPromise = null
+          resolve(false)
+        }, { once: true })
+      }
       return
     }
 
@@ -60,9 +78,14 @@ export function loadRazorpayScript(): Promise<boolean> {
     script.src = "https://checkout.razorpay.com/v1/checkout.js"
     script.async = true
     script.onload = () => resolve(true)
-    script.onerror = () => resolve(false)
+    script.onerror = () => {
+      scriptLoadingPromise = null
+      resolve(false)
+    }
     document.body.appendChild(script)
   })
+
+  return scriptLoadingPromise
 }
 
 export async function openRazorpayCheckout(

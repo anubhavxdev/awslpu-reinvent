@@ -48,10 +48,12 @@ export async function backendFetch(
     // Outside request context
   }
 
+  const { cache, ...restOptions } = options
+
   return fetch(`${backendApiUrl.replace(/\/$/, "")}${path}`, {
-    ...options,
+    ...restOptions,
     headers,
-    cache: "no-store"
+    cache: cache ?? "no-store"
   })
 }
 
