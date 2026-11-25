@@ -34,6 +34,10 @@ export interface Order {
   items: OrderItem[]
   total_amount: number
   currency: string
+  coupon_code?: string | null
+  discount_percent?: number | null
+  discount_amount?: number | null
+  original_amount?: number | null
   status: "pending" | "paid" | "failed" | "cancelled" | "expired"
   payment_status: string
   razorpay_order_id?: string

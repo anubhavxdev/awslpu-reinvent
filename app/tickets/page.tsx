@@ -26,7 +26,9 @@ import {
   Calendar,
   X,
   ChevronRight,
-  UserCheck
+  UserCheck,
+  Tag,
+  Percent
 } from "lucide-react"
 import { useAuth } from "@/providers/auth-provider"
 import { openRazorpayCheckout } from "@/lib/razorpay"
@@ -98,6 +100,19 @@ export default function TicketsPage() {
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null)
   const [pollingStatus, setPollingStatus] = useState<string>("")
   const [isPaying, setIsPaying] = useState(false)
+
+  // Coupon state
+  const [couponCodeInput, setCouponCodeInput] = useState("")
+  const [appliedCoupon, setAppliedCoupon] = useState<{
+    code: string
+    discount_percent: number
+    discount_amount_in_paise: number
+    original_amount_in_paise: number
+    final_amount_in_paise: number
+  } | null>(null)
+  const [validatingCoupon, setValidatingCoupon] = useState(false)
+  const [couponError, setCouponError] = useState<string | null>(null)
+  const [couponSuccess, setCouponSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     async function fetchCategories() {
@@ -172,12 +187,72 @@ export default function TicketsPage() {
     ) {
       return
     }
-    setSelectedCategoryId((prev) => (prev === categoryId ? null : categoryId))
+    setSelectedCategoryId((prev) => {
+      const next = prev === categoryId ? null : categoryId
+      if (next !== prev) {
+        setAppliedCoupon(null)
+        setCouponCodeInput("")
+        setCouponError(null)
+        setCouponSuccess(null)
+        setCreatedOrder(null)
+      }
+      return next
+    })
   }
 
   const selectedCategory = categories.find((c) => c.id === selectedCategoryId)
   const unitPrice = selectedCategory ? selectedCategory.price_in_paise / 100 : 0
-  const totalAmount = unitPrice
+  const discountAmount = appliedCoupon ? appliedCoupon.discount_amount_in_paise / 100 : 0
+  const totalAmount = Math.max(0, unitPrice - discountAmount)
+
+  const handleApplyCoupon = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    const code = couponCodeInput.trim().toUpperCase()
+    if (!code) {
+      setCouponError("Please enter a promo/coupon code.")
+      setCouponSuccess(null)
+      return
+    }
+    if (!selectedCategory) return
+
+    setValidatingCoupon(true)
+    setCouponError(null)
+    setCouponSuccess(null)
+
+    try {
+      const res = await fetch(
+        `/api/coupons/validate?code=${encodeURIComponent(code)}&category_id=${selectedCategory.id}&amount_in_paise=${selectedCategory.price_in_paise}`
+      )
+      const data = await res.json()
+      if (!res.ok || !data.valid) {
+        setCouponError(data.message || data.detail || "Invalid or inactive coupon code.")
+        setAppliedCoupon(null)
+        return
+      }
+
+      setAppliedCoupon({
+        code: data.code,
+        discount_percent: data.discount_percent,
+        discount_amount_in_paise: data.discount_amount_in_paise,
+        original_amount_in_paise: data.original_amount_in_paise,
+        final_amount_in_paise: data.final_amount_in_paise
+      })
+      setCouponSuccess(`Coupon ${data.code} applied! ${data.discount_percent}% discount`)
+      setCreatedOrder(null)
+    } catch {
+      setCouponError("Could not validate coupon code. Please try again.")
+    } finally {
+      setValidatingCoupon(false)
+    }
+  }
+
+  const handleRemoveCoupon = () => {
+    setAppliedCoupon(null)
+    setCouponCodeInput("")
+    setCouponError(null)
+    setCouponSuccess(null)
+    setCreatedOrder(null)
+  }
 
   const handleStartCheckout = () => {
     if (!authenticated) {
@@ -244,19 +319,27 @@ export default function TicketsPage() {
         createdOrder &&
         createdOrder.status === "pending" &&
         createdOrder.items?.some((item) => item.category_id === selectedCategoryId) &&
+        (createdOrder.coupon_code || null) === (appliedCoupon?.code || null) &&
         createdOrder.expires_at &&
         new Date(createdOrder.expires_at).getTime() > Date.now() + 15000
 
       if (isPendingValid) {
         order = createdOrder
       } else {
-        const orderPayload = {
+        const orderPayload: {
+          items: { category_id: string; quantity: number }[]
+          coupon_code?: string
+        } = {
           items: [
             {
               category_id: selectedCategoryId,
               quantity: 1
             }
           ]
+        }
+
+        if (appliedCoupon) {
+          orderPayload.coupon_code = appliedCoupon.code
         }
 
         const orderRes = await fetch("/api/orders", {
@@ -276,6 +359,12 @@ export default function TicketsPage() {
 
       if (!order) {
         throw new Error("Order creation failed. Please try again.")
+      }
+
+      if (order.status === "paid" || order.total_amount === 0) {
+        await refreshExistingTicket()
+        setCheckoutStep("success")
+        return
       }
 
       setPollingStatus("Opening Razorpay payment gateway...")
@@ -837,10 +926,15 @@ export default function TicketsPage() {
                       </p>
                     </div>
                     <p className="mt-1 text-2xl sm:text-3xl font-extralight text-white font-mono">
-                      ₹{totalAmount.toLocaleString("en-IN")}{" "}
+                      {totalAmount === 0 ? "FREE" : `₹${totalAmount.toLocaleString("en-IN")}`}{" "}
                       <span className="text-xs uppercase text-white/40 tracking-widest font-sans">
                         INR / Total
                       </span>
+                      {appliedCoupon && (
+                        <span className="ml-2 text-xs font-mono text-emerald-400 font-normal">
+                          ({appliedCoupon.discount_percent}% OFF)
+                        </span>
+                      )}
                     </p>
                   </div>
 
@@ -912,13 +1006,128 @@ export default function TicketsPage() {
                 <span className="text-emerald-400">Included</span>
               </div>
 
+              {/* Coupon Discount breakdown line if applied */}
+              {appliedCoupon && (
+                <div className="flex items-center justify-between text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2">
+                  <span className="flex items-center gap-1.5 font-mono">
+                    <Tag className="h-3.5 w-3.5" />
+                    Coupon Discount ({appliedCoupon.code} - {appliedCoupon.discount_percent}% OFF)
+                  </span>
+                  <span className="font-mono font-semibold">
+                    -₹{discountAmount.toLocaleString("en-IN")}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between border-t border-white/15 pt-6 text-lg sm:text-xl font-light text-white">
-                <span>Total Amount Due</span>
-                <span className="text-3xl font-light text-[#FF00D4] font-mono">
-                  ₹{totalAmount.toLocaleString("en-IN")}{" "}
-                  <span className="text-xs text-white/50 uppercase font-sans">INR</span>
-                </span>
+                <div>
+                  <span>Total Amount Due</span>
+                  {appliedCoupon && (
+                    <span className="ml-2 text-xs font-mono text-emerald-400 font-normal">
+                      ({appliedCoupon.discount_percent}% OFF)
+                    </span>
+                  )}
+                </div>
+                <div className="text-right">
+                  {appliedCoupon && (
+                    <span className="block text-xs line-through text-white/40 font-mono">
+                      ₹{unitPrice.toLocaleString("en-IN")} INR
+                    </span>
+                  )}
+                  <span className="text-3xl font-light text-[#FF00D4] font-mono">
+                    {totalAmount === 0 ? "FREE" : `₹${totalAmount.toLocaleString("en-IN")}`}{" "}
+                    <span className="text-xs text-white/50 uppercase font-sans">INR</span>
+                  </span>
+                </div>
               </div>
+            </div>
+
+            {/* Promo / Coupon Code Section */}
+            <div className="mt-6 border border-white/10 bg-white/[0.02] p-5">
+              <div className="flex items-center justify-between mb-3">
+                <label htmlFor="coupon-code" className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-[#FF2D87]">
+                  <Percent className="h-3.5 w-3.5" />
+                  Have a Coupon or Referral Code?
+                </label>
+                {appliedCoupon && (
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5">
+                    Active Code
+                  </span>
+                )}
+              </div>
+
+              {!appliedCoupon ? (
+                <form onSubmit={handleApplyCoupon} className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      id="coupon-code"
+                      type="text"
+                      value={couponCodeInput}
+                      onChange={(e) => {
+                        setCouponCodeInput(e.target.value.toUpperCase())
+                        setCouponError(null)
+                        setCouponSuccess(null)
+                      }}
+                      placeholder="ENTER PROMO CODE (OPTIONAL)"
+                      disabled={validatingCoupon}
+                      className="w-full border border-white/15 bg-black/60 px-4 py-3 font-mono text-xs uppercase tracking-wider text-white placeholder-white/30 focus:border-[#FF00D4] focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={validatingCoupon || !couponCodeInput.trim()}
+                    className="flex items-center justify-center gap-2 border border-[#FF00D4] bg-[#FF00D4]/20 px-6 font-mono text-xs font-semibold uppercase tracking-wider text-[#FF2D87] hover:bg-[#FF00D4] hover:text-white transition disabled:opacity-40"
+                  >
+                    {validatingCoupon ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      "Apply"
+                    )}
+                  </button>
+                </form>
+              ) : (
+                <div className="flex items-center justify-between border border-emerald-500/30 bg-emerald-950/20 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-sm bg-emerald-500/20 text-emerald-400">
+                      <Tag className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-emerald-300">
+                          {appliedCoupon.code}
+                        </span>
+                        <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5">
+                          {appliedCoupon.discount_percent}% OFF
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-emerald-400/80">
+                        Saving ₹{discountAmount.toLocaleString("en-IN")} on your festival pass
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveCoupon}
+                    className="font-mono text-[11px] uppercase text-rose-400 hover:text-rose-300 underline underline-offset-2 transition"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+
+              {couponError && (
+                <p className="mt-2 text-[11px] font-mono text-rose-400 flex items-center gap-1.5">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  {couponError}
+                </p>
+              )}
+
+              {couponSuccess && !couponError && (
+                <p className="mt-2 text-[11px] font-mono text-emerald-400 flex items-center gap-1.5">
+                  <Check className="h-3.5 w-3.5 shrink-0" />
+                  {couponSuccess}
+                </p>
+              )}
             </div>
 
             {/* Attendee Profile Box */}
@@ -958,6 +1167,11 @@ export default function TicketsPage() {
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>Processing Reservation...</span>
+                  </>
+                ) : totalAmount === 0 ? (
+                  <>
+                    <Sparkles className="h-4 w-4 text-emerald-300" />
+                    <span>Claim Free Pass (100% Off)</span>
                   </>
                 ) : (
                   <>
@@ -1016,6 +1230,22 @@ export default function TicketsPage() {
                 <div className="flex justify-between py-1.5 border-b border-white/10">
                   <span className="text-white/40">Pass Category</span>
                   <span className="text-white">{selectedCategory?.name || "Festival Pass"}</span>
+                </div>
+                {createdOrder.coupon_code && (
+                  <div className="flex justify-between py-1.5 border-b border-white/10 text-emerald-400">
+                    <span className="text-white/40">Coupon Applied</span>
+                    <span>
+                      {createdOrder.coupon_code} ({createdOrder.discount_percent}% OFF)
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between py-1.5 border-b border-white/10">
+                  <span className="text-white/40">Final Amount Paid</span>
+                  <span className="text-white">
+                    {createdOrder.total_amount === 0
+                      ? "FREE (100% Discount)"
+                      : `₹${(createdOrder.total_amount / 100).toLocaleString("en-IN")} INR`}
+                  </span>
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span className="text-white/40">Admission Status</span>

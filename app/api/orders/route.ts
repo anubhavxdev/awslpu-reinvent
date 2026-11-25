@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { backendFetch, backendJson } from "@/lib/api/backend"
+import { backendFetch, backendJson, formatFastApiError } from "@/lib/api/backend"
 import { getAuthCookies } from "@/lib/api/auth-cookies"
 import type { Order } from "@/types/ticketing"
 
@@ -26,8 +26,9 @@ export async function POST(request: Request) {
 
     if (!response.ok) {
       const err = await response.json().catch(() => null)
+      const errorMsg = formatFastApiError(err, "Order creation failed")
       return NextResponse.json(
-        { detail: err?.detail || "Order creation failed" },
+        { detail: errorMsg },
         { status: response.status }
       )
     }
