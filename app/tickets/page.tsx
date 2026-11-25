@@ -31,7 +31,7 @@ import {
   Percent
 } from "lucide-react"
 import { useAuth } from "@/providers/auth-provider"
-import { openRazorpayCheckout } from "@/lib/razorpay"
+import { openRazorpayCheckout, loadRazorpayScript, type RazorpayResponse } from "@/lib/razorpay"
 import type { TicketCategory, Order, Ticket } from "@/types/ticketing"
 
 const universalPerks = [
@@ -129,6 +129,7 @@ export default function TicketsPage() {
       }
     }
     fetchCategories()
+    loadRazorpayScript().catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -380,8 +381,9 @@ export default function TicketsPage() {
       const buyerEmail = user?.email || ""
       const buyerPhone = user?.phone || ""
 
+      let rzpResponse: RazorpayResponse | null = null
       try {
-        await openRazorpayCheckout({
+        rzpResponse = await openRazorpayCheckout({
           key: checkoutData.key,
           amount: checkoutData.amount,
           currency: checkoutData.currency,
@@ -401,9 +403,39 @@ export default function TicketsPage() {
         return
       }
 
-      setPollingStatus("Confirming payment & issuing digital ticket...")
+      setPollingStatus("Verifying payment signature & issuing pass...")
+
+      // Instant cryptographic verification: confirms and issues tickets in <100ms
+      if (rzpResponse) {
+        try {
+          const verifyRes = await fetch(`/api/orders/${order.id}/verify`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_payment_id: rzpResponse.razorpay_payment_id,
+              razorpay_order_id: rzpResponse.razorpay_order_id,
+              razorpay_signature: rzpResponse.razorpay_signature
+            })
+          })
+
+          if (verifyRes.ok) {
+            const verifiedOrder: Order = await verifyRes.json()
+            if (verifiedOrder.status === "paid") {
+              setCreatedOrder(verifiedOrder)
+              await refreshExistingTicket()
+              setCheckoutStep("success")
+              return
+            }
+          }
+        } catch (verifyErr) {
+          console.warn("Direct verification request failed, falling back to status check:", verifyErr)
+        }
+      }
+
+      // Fallback reconciliation loop (if direct verify encountered network trouble)
+      setPollingStatus("Confirming pass status...")
       let attempts = 0
-      const maxAttempts = 15
+      const maxAttempts = 10
 
       while (attempts < maxAttempts) {
         attempts++
@@ -436,7 +468,7 @@ export default function TicketsPage() {
             throw pollErr
           }
         }
-        await new Promise((resolve) => setTimeout(resolve, 2000))
+        await new Promise((resolve) => setTimeout(resolve, 1500))
       }
 
       await refreshExistingTicket()

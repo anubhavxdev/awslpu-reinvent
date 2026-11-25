@@ -46,11 +46,18 @@ export async function GET() {
       venue: venueMap.get(session.venue_id)
     }))
 
-    return NextResponse.json({
-      sessions: populated,
-      speakers,
-      venues
-    })
+    return NextResponse.json(
+      {
+        sessions: populated,
+        speakers,
+        venues
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300"
+        }
+      }
+    )
   } catch {
     return NextResponse.json({
       sessions: [],
