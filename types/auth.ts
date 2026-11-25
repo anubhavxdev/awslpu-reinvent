@@ -21,6 +21,8 @@ export interface AuthUser {
   socials: Socials | null
   roles: string[]
   is_active: boolean
+  is_blocked?: boolean
+  blocked_reason?: string | null
   email_verified: boolean
   created_at: string
   updated_at: string

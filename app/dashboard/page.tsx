@@ -21,7 +21,8 @@ import {
   Clock,
   Sparkles,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  Ban
 } from "lucide-react"
 import { useAuth } from "@/providers/auth-provider"
 import { QrCode } from "@/components/qr-code"
@@ -234,6 +235,31 @@ export default function DashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* Security Alert: Blocked Account Banner */}
+        {user.is_blocked && (
+          <div className="mt-8 border border-rose-500 bg-rose-950/40 p-6 backdrop-blur-md shadow-[0_0_35px_rgba(244,63,94,0.25)]">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm border border-rose-500 bg-rose-500/20 text-rose-400">
+                <Ban className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-rose-400">
+                  Security Enforcement Notice // Account Restricted
+                </span>
+                <h3 className="text-xl font-light text-white">
+                  Your festival delegate account is currently <span className="font-semibold text-rose-300">BLOCKED</span>
+                </h3>
+                <p className="text-xs text-white/70">
+                  <span className="font-semibold text-white">Documented Reason:</span> {user.blocked_reason || "Administrative suspension by festival operations"}
+                </p>
+                <p className="text-[11px] text-white/40 pt-1">
+                  While suspended, pass issuance, ticket check-in at venue gates, and registration privileges are revoked. Contact <span className="text-white underline">reinvent@awslpu.in</span> for assistance.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="mt-8 flex gap-2 border-b border-white/10 pb-4 overflow-x-auto scrollbar-none">
           <button

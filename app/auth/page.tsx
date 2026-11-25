@@ -274,18 +274,28 @@ function AuthForm() {
 
             {statusMessage && (
               <div
-                className={`mb-8 flex items-start gap-3 border-b pb-4 text-sm ${
+                className={`mb-8 flex items-start gap-3 border p-4 text-xs font-mono ${
                   statusMessage.type === "success"
-                    ? "border-emerald-500/30 text-emerald-300"
-                    : "border-rose-500/30 text-rose-300"
+                    ? "border-emerald-500/40 bg-emerald-950/20 text-emerald-300"
+                    : statusMessage.text.toLowerCase().includes("blocked")
+                    ? "border-rose-500 bg-rose-950/40 text-rose-200 shadow-[0_0_25px_rgba(244,63,94,0.2)]"
+                    : "border-rose-500/30 bg-rose-950/20 text-rose-300"
                 }`}
               >
                 {statusMessage.type === "success" ? (
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                 ) : (
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
                 )}
-                <span>{statusMessage.text}</span>
+                <div className="flex-1">
+                  <p className="font-semibold">{statusMessage.text}</p>
+                  {statusMessage.text.toLowerCase().includes("blocked") && (
+                    <p className="mt-1.5 text-[11px] text-rose-300/80 font-sans leading-relaxed">
+                      Your access has been restricted by event operations. If you believe this is an error, please contact the festival desk at{" "}
+                      <span className="underline text-white">awsbuilders@awslpu.in</span>.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
