@@ -45,6 +45,7 @@ export interface RegisterRequest {
   phone: string
   workspace_name?: string | null
   workspace_uid?: string | null
+  referral_code?: string | null
   password: string
 }
 

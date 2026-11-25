@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Lock,
   User,
+  Tag,
 } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -64,12 +65,16 @@ function AuthForm() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   useEffect(() => {
     const mode = searchParams.get("mode");
-
     if (mode === "login" || mode === "register") {
       setAuthMode(mode);
+    }
+    const refParam = searchParams.get("ref") || searchParams.get("referral");
+    if (refParam) {
+      setReferralCode(refParam.trim().toUpperCase());
     }
   }, [searchParams]);
 
@@ -103,6 +108,7 @@ function AuthForm() {
           phone: normalizePhone(phone),
           workspace_name: workspaceName.trim(),
           workspace_uid: workspaceId.trim(),
+          referral_code: referralCode.trim() ? referralCode.trim().toUpperCase() : null,
           password,
         });
 
@@ -352,6 +358,28 @@ function AuthForm() {
                       placeholder="+91 98765 43210"
                       className={inputClass}
                     />
+                  </div>
+
+                  <div className="border-b border-white/20 transition-colors focus-within:border-[#FF00D4]">
+                    <div className="flex items-center justify-between">
+                      <label className={labelClass}>Referral Code (Optional)</label>
+                      {referralCode.trim() && (
+                        <span className="text-[10px] font-mono text-emerald-400 font-semibold">
+                          Code applied
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Tag className="h-4 w-4 shrink-0 text-white/30" />
+                      <input
+                        type="text"
+                        autoCapitalize="characters"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. CAMPUS2026, AMBASSADOR"
+                        className={`${inputClass} font-mono tracking-wider`}
+                      />
+                    </div>
                   </div>
                 </>
               )}
